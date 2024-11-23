@@ -13,7 +13,9 @@ interface PageProps {
 export default function Page({ params }: PageProps) {
   const { channelName } = use(params)
   const [token, setToken] = useState<string>("")
+  const [sToken, setStoken] = useState<string>("")
   const [uid] = useState(() => Math.floor(10000 + Math.random() * 90000))
+  const [suid] = useState(() => Math.floor(10000 + Math.random() * 90000))
   const [error, setError] = useState<string>("")
 
   useEffect(() => {
@@ -30,19 +32,39 @@ export default function Page({ params }: PageProps) {
           }),
         })
 
-        if (!response.ok) {
-          throw new Error('Failed to generate token')
+        const response2 = await fetch('/api/generate-agora-token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            channelName,
+            uid: suid,
+          }),
+        })
+
+        if (!response.ok || !response2.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || 'Failed to generate token')
         }
 
         const data = await response.json()
+        const data2 = await response2.json()
+
+        if (!data.token || !data2.token) {
+          throw new Error('Token not received from server')
+        }
+
         setToken(data.token)
+        setStoken(data2.token)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to generate token')
+        console.error('Token generation error:', err)
       }
     }
 
     generateToken()
-  }, [channelName, uid])
+  }, [channelName, uid, suid])
 
   if (error) {
     return (
@@ -61,7 +83,7 @@ export default function Page({ params }: PageProps) {
     )
   }
 
-  if (!token) {
+  if (!token || !sToken) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-white">
@@ -92,12 +114,14 @@ export default function Page({ params }: PageProps) {
         token={token}
         channelName={channelName}
         uid={uid}
+        stoken={sToken}
+        suid={suid}
       />
     </main>
   )
 }
 
-Page.ErrorBoundary = function ErrorBoundary({ error }: { error: Error }) {
+export function ErrorBoundary({ error }: { error: Error }) {
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center">
       <div className="text-center text-white">

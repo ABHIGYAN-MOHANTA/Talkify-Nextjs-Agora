@@ -30,18 +30,24 @@ interface CallProps {
   channelName: string;
   token: string;
   uid: number;
+  stoken: string;
+  suid: number; 
 }
 
 function Videos({
   channelName,
   appId,
   token,
-  uid
+  uid,
+  stoken,
+  suid
 }: {
   channelName: string;
   appId: string;
   token: string;
   uid: number;
+  stoken: string;
+  suid: number;
 }) {
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
@@ -67,7 +73,7 @@ function Videos({
     appid: appId,
     channel: channelName,
     token: token,
-    uid: uid
+    uid: uid,
   });
 
   usePublish([localMicrophoneTrack, localCameraTrack]);
@@ -128,7 +134,7 @@ function Videos({
       } else {
         // Ensure the client has joined the channel
         if (!client.connectionState || client.connectionState !== 'CONNECTED') {
-          await client.join(appId, channelName, token, uid);
+          await client.join(appId, channelName, stoken, suid);
         }
 
         // Start screen sharing
@@ -150,7 +156,6 @@ function Videos({
       console.error('Error toggling screen sharing:', error);
     }
   };
-
 
 
   // Handle camera toggle
