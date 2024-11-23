@@ -12,97 +12,152 @@ import AgoraRTC, {
   useRemoteAudioTracks,
   useRemoteUsers,
   useRemoteVideoTracks,
-} from "agora-rtc-react"
-import { useState, useEffect } from "react"
-import { Camera, CameraOff, Mic, MicOff, PhoneOff, Loader2 } from "lucide-react"
+} from 'agora-rtc-react';
+import { useState, useEffect } from 'react';
+import {
+  Camera,
+  CameraOff,
+  Mic,
+  MicOff,
+  PhoneOff,
+  Loader2,
+  Monitor,
+  MonitorOff,
+} from 'lucide-react';
 
 interface CallProps {
-  appId: string
-  channelName: string
-  token: string
+  appId: string;
+  channelName: string;
+  token: string;
 }
 
-function Videos({ channelName, AppID, Token }: { channelName: string; AppID: string; Token: string; }) {
-  const [isVideoEnabled, setIsVideoEnabled] = useState(true)
-  const [isAudioEnabled, setIsAudioEnabled] = useState(true)
-  const [isMicReady, setIsMicReady] = useState(false)
-  const [isCameraReady, setIsCameraReady] = useState(false)
+function Videos({
+  channelName,
+  appId,
+  token,
+}: {
+  channelName: string;
+  appId: string;
+  token: string;
+}) {
+  const [isVideoEnabled, setIsVideoEnabled] = useState(true);
+  const [isAudioEnabled, setIsAudioEnabled] = useState(true);
+  const [isMicReady, setIsMicReady] = useState(false);
+  const [isCameraReady, setIsCameraReady] = useState(false);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [screenTrack, setScreenTrack] = useState<any | null>(null);
 
-  const { isLoading: isLoadingMic, localMicrophoneTrack } = useLocalMicrophoneTrack(isAudioEnabled)
-  const { isLoading: isLoadingCam, localCameraTrack } = useLocalCameraTrack(isVideoEnabled)
-  const remoteUsers = useRemoteUsers()
-  const { videoTracks } = useRemoteVideoTracks(remoteUsers)
-  const { audioTracks } = useRemoteAudioTracks(remoteUsers)
+  const { isLoading: isLoadingMic, localMicrophoneTrack } =
+    useLocalMicrophoneTrack(isAudioEnabled);
+  const { isLoading: isLoadingCam, localCameraTrack } =
+    useLocalCameraTrack(isVideoEnabled);
+
+  const remoteUsers = useRemoteUsers();
+  const { videoTracks } = useRemoteVideoTracks(remoteUsers);
+  const { audioTracks } = useRemoteAudioTracks(remoteUsers);
+
+  const client = useRTCClient(
+    AgoraRTC.createClient({ codec: 'vp8', mode: 'rtc' })
+  );
 
   useJoin({
-    appid: AppID,
+    appid: appId,
     channel: channelName,
-    token: Token
-  })
+    token: token,
+  });
+
+  usePublish([localMicrophoneTrack, localCameraTrack]);
 
   // Handle camera track enable/disable
   useEffect(() => {
     const setupCamera = async () => {
       if (localCameraTrack) {
         try {
-          await localCameraTrack.setEnabled(isVideoEnabled)
-          setIsCameraReady(true)
+          await localCameraTrack.setEnabled(isVideoEnabled);
+          setIsCameraReady(true);
         } catch (error) {
-          console.error('Error setting camera state:', error)
-          setIsCameraReady(false)
+          console.error('Error setting camera state:', error);
+          setIsCameraReady(false);
         }
       }
-    }
+    };
 
-    setupCamera()
+    setupCamera();
 
     return () => {
-      setIsCameraReady(false)
-    }
-  }, [isVideoEnabled, localCameraTrack])
+      setIsCameraReady(false);
+    };
+  }, [isVideoEnabled, localCameraTrack]);
 
   // Handle microphone track enable/disable
   useEffect(() => {
     const setupMic = async () => {
       if (localMicrophoneTrack) {
         try {
-          await localMicrophoneTrack.setEnabled(isAudioEnabled)
-          setIsMicReady(true)
+          await localMicrophoneTrack.setEnabled(isAudioEnabled);
+          setIsMicReady(true);
         } catch (error) {
-          console.error('Error setting microphone state:', error)
-          setIsMicReady(false)
+          console.error('Error setting microphone state:', error);
+          setIsMicReady(false);
         }
       }
-    }
+    };
 
-    setupMic()
+    setupMic();
 
     return () => {
-      setIsMicReady(false)
-    }
-  }, [isAudioEnabled, localMicrophoneTrack])
+      setIsMicReady(false);
+    };
+  }, [isAudioEnabled, localMicrophoneTrack]);
 
-  usePublish([localMicrophoneTrack, localCameraTrack])
-
-  // Handle camera toggle with error handling
-  const handleCameraToggle = async () => {
+  // Handle screen sharing toggle
+  const handleScreenShareToggle = async () => {
     try {
-      setIsVideoEnabled(!isVideoEnabled)
-    } catch (error) {
-      console.error('Error toggling camera:', error)
-      setIsVideoEnabled(isVideoEnabled)
-    }
-  }
+      if (isScreenSharing) {
+        // Stop screen sharing
+        if (screenTrack) {
+          await client.unpublish(screenTrack);
+          screenTrack.close();
+          setScreenTrack(null);
+        }
+        setIsScreenSharing(false);
+      } else {
+        // Ensure the client has joined the channel
+        if (!client.connectionState || client.connectionState !== 'CONNECTED') {
+          await client.join(appId, channelName, token);
+        }
 
-  // Handle mic toggle with error handling
-  const handleMicToggle = async () => {
-    try {
-      setIsAudioEnabled(!isAudioEnabled)
+        // Start screen sharing
+        const screenTracks = await AgoraRTC.createScreenVideoTrack(
+          {
+            encoderConfig: '1080p_1', // Video encoding settings
+          },
+          'disable' // Disable screen share audio
+        );
+
+        // Handle if screenTracks is an array or a single track
+        const track = Array.isArray(screenTracks) ? screenTracks[0] : screenTracks;
+
+        await client.publish(track);
+        setScreenTrack(track);
+        setIsScreenSharing(true);
+      }
     } catch (error) {
-      console.error('Error toggling microphone:', error)
-      setIsAudioEnabled(isAudioEnabled)
+      console.error('Error toggling screen sharing:', error);
     }
-  }
+  };
+
+
+
+  // Handle camera toggle
+  const handleCameraToggle = () => {
+    setIsVideoEnabled((prev) => !prev);
+  };
+
+  // Handle mic toggle
+  const handleMicToggle = () => {
+    setIsAudioEnabled((prev) => !prev);
+  };
 
   return (
     <div className="relative min-h-screen bg-gray-900">
@@ -119,7 +174,7 @@ function Videos({ channelName, AppID, Token }: { channelName: string; AppID: str
         {localCameraTrack && isVideoEnabled && isCameraReady ? (
           <LocalVideoTrack
             track={localCameraTrack}
-            play={true}
+            play
             className="w-full h-full object-cover"
           />
         ) : (
@@ -137,8 +192,8 @@ function Videos({ channelName, AppID, Token }: { channelName: string; AppID: str
           >
             <RemoteUser
               user={user}
-              playVideo={true}
-              playAudio={true}
+              playVideo
+              playAudio
               className="w-full h-full object-cover"
             />
           </div>
@@ -147,7 +202,9 @@ function Videos({ channelName, AppID, Token }: { channelName: string; AppID: str
           <div className="col-span-full h-[50vh] flex items-center justify-center">
             <div className="text-center text-gray-400">
               <Camera className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <h3 className="text-xl font-medium mb-2">Waiting for others to join...</h3>
+              <h3 className="text-xl font-medium mb-2">
+                Waiting for others to join...
+              </h3>
               <p>Share the channel name with others to invite them</p>
             </div>
           </div>
@@ -159,8 +216,11 @@ function Videos({ channelName, AppID, Token }: { channelName: string; AppID: str
           onClick={handleCameraToggle}
           disabled={isLoadingCam || !isCameraReady}
           title={!isCameraReady ? 'Camera not available' : ''}
-          className={`p-4 rounded-full transition-all ${isLoadingCam || !isCameraReady ? 'bg-gray-700 opacity-50 cursor-not-allowed' :
-              isVideoEnabled ? 'bg-gray-700 hover:bg-gray-600' : 'bg-red-500 hover:bg-red-600'
+          className={`p-4 rounded-full transition-all ${isLoadingCam || !isCameraReady
+              ? 'bg-gray-700 opacity-50 cursor-not-allowed'
+              : isVideoEnabled
+                ? 'bg-gray-700 hover:bg-gray-600'
+                : 'bg-red-500 hover:bg-red-600'
             }`}
         >
           {isLoadingCam ? (
@@ -176,8 +236,11 @@ function Videos({ channelName, AppID, Token }: { channelName: string; AppID: str
           onClick={handleMicToggle}
           disabled={isLoadingMic || !isMicReady}
           title={!isMicReady ? 'Microphone not available' : ''}
-          className={`p-4 rounded-full transition-all ${isLoadingMic || !isMicReady ? 'bg-gray-700 opacity-50 cursor-not-allowed' :
-              isAudioEnabled ? 'bg-gray-700 hover:bg-gray-600' : 'bg-red-500 hover:bg-red-600'
+          className={`p-4 rounded-full transition-all ${isLoadingMic || !isMicReady
+              ? 'bg-gray-700 opacity-50 cursor-not-allowed'
+              : isAudioEnabled
+                ? 'bg-gray-700 hover:bg-gray-600'
+                : 'bg-red-500 hover:bg-red-600'
             }`}
         >
           {isLoadingMic ? (
@@ -189,6 +252,20 @@ function Videos({ channelName, AppID, Token }: { channelName: string; AppID: str
           )}
         </button>
 
+        <button
+          onClick={handleScreenShareToggle}
+          className={`p-4 rounded-full transition-all ${isScreenSharing
+              ? 'bg-red-500 hover:bg-red-600'
+              : 'bg-gray-700 hover:bg-gray-600'
+            }`}
+        >
+          {isScreenSharing ? (
+            <MonitorOff className="w-6 h-6 text-white" />
+          ) : (
+            <Monitor className="w-6 h-6 text-white" />
+          )}
+        </button>
+
         <a
           href="/"
           className="p-4 rounded-full bg-red-500 hover:bg-red-600 transition-all"
@@ -197,15 +274,15 @@ function Videos({ channelName, AppID, Token }: { channelName: string; AppID: str
         </a>
       </div>
     </div>
-  )
+  );
 }
 
 export default function Call(props: CallProps) {
-  const client = useRTCClient(AgoraRTC.createClient({ codec: "vp8", mode: "rtc" }))
+  const client = useRTCClient(AgoraRTC.createClient({ codec: 'vp8', mode: 'rtc' }));
 
   return (
     <AgoraRTCProvider client={client}>
-      <Videos channelName={props.channelName} AppID={props.appId} Token={props.token} />
+      <Videos {...props} />
     </AgoraRTCProvider>
-  )
+  );
 }
