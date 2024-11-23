@@ -25,6 +25,8 @@ interface CallProps {
 function Videos({ channelName, AppID, Token }: { channelName: string; AppID: string; Token: string; }) {
   const [isVideoEnabled, setIsVideoEnabled] = useState(true)
   const [isAudioEnabled, setIsAudioEnabled] = useState(true)
+  const [isMicReady, setIsMicReady] = useState(false)
+  const [isCameraReady, setIsCameraReady] = useState(false)
 
   const { isLoading: isLoadingMic, localMicrophoneTrack } = useLocalMicrophoneTrack(isAudioEnabled)
   const { isLoading: isLoadingCam, localCameraTrack } = useLocalCameraTrack(isVideoEnabled)
@@ -38,7 +40,69 @@ function Videos({ channelName, AppID, Token }: { channelName: string; AppID: str
     token: Token
   })
 
+  // Handle camera track enable/disable
+  useEffect(() => {
+    const setupCamera = async () => {
+      if (localCameraTrack) {
+        try {
+          await localCameraTrack.setEnabled(isVideoEnabled)
+          setIsCameraReady(true)
+        } catch (error) {
+          console.error('Error setting camera state:', error)
+          setIsCameraReady(false)
+        }
+      }
+    }
+
+    setupCamera()
+
+    return () => {
+      setIsCameraReady(false)
+    }
+  }, [isVideoEnabled, localCameraTrack])
+
+  // Handle microphone track enable/disable
+  useEffect(() => {
+    const setupMic = async () => {
+      if (localMicrophoneTrack) {
+        try {
+          await localMicrophoneTrack.setEnabled(isAudioEnabled)
+          setIsMicReady(true)
+        } catch (error) {
+          console.error('Error setting microphone state:', error)
+          setIsMicReady(false)
+        }
+      }
+    }
+
+    setupMic()
+
+    return () => {
+      setIsMicReady(false)
+    }
+  }, [isAudioEnabled, localMicrophoneTrack])
+
   usePublish([localMicrophoneTrack, localCameraTrack])
+
+  // Handle camera toggle with error handling
+  const handleCameraToggle = async () => {
+    try {
+      setIsVideoEnabled(!isVideoEnabled)
+    } catch (error) {
+      console.error('Error toggling camera:', error)
+      setIsVideoEnabled(isVideoEnabled)
+    }
+  }
+
+  // Handle mic toggle with error handling
+  const handleMicToggle = async () => {
+    try {
+      setIsAudioEnabled(!isAudioEnabled)
+    } catch (error) {
+      console.error('Error toggling microphone:', error)
+      setIsAudioEnabled(isAudioEnabled)
+    }
+  }
 
   return (
     <div className="relative min-h-screen bg-gray-900">
@@ -52,14 +116,13 @@ function Videos({ channelName, AppID, Token }: { channelName: string; AppID: str
       )}
 
       <div className="absolute bottom-24 right-4 w-64 h-48 rounded-lg overflow-hidden border-2 border-blue-500 shadow-lg">
-        {localCameraTrack && (
+        {localCameraTrack && isVideoEnabled && isCameraReady ? (
           <LocalVideoTrack
             track={localCameraTrack}
             play={true}
             className="w-full h-full object-cover"
           />
-        )}
-        {!localCameraTrack && (
+        ) : (
           <div className="w-full h-full bg-gray-800 flex items-center justify-center">
             <Camera className="w-8 h-8 text-gray-400" />
           </div>
@@ -93,9 +156,10 @@ function Videos({ channelName, AppID, Token }: { channelName: string; AppID: str
 
       <div className="fixed bottom-0 left-0 right-0 flex justify-center items-center gap-4 p-4 bg-gray-900/80 backdrop-blur-sm">
         <button
-          onClick={() => setIsVideoEnabled(!isVideoEnabled)}
-          disabled={isLoadingCam}
-          className={`p-4 rounded-full transition-all ${isLoadingCam ? 'bg-gray-700 opacity-50 cursor-not-allowed' :
+          onClick={handleCameraToggle}
+          disabled={isLoadingCam || !isCameraReady}
+          title={!isCameraReady ? 'Camera not available' : ''}
+          className={`p-4 rounded-full transition-all ${isLoadingCam || !isCameraReady ? 'bg-gray-700 opacity-50 cursor-not-allowed' :
               isVideoEnabled ? 'bg-gray-700 hover:bg-gray-600' : 'bg-red-500 hover:bg-red-600'
             }`}
         >
@@ -109,9 +173,10 @@ function Videos({ channelName, AppID, Token }: { channelName: string; AppID: str
         </button>
 
         <button
-          onClick={() => setIsAudioEnabled(!isAudioEnabled)}
-          disabled={isLoadingMic}
-          className={`p-4 rounded-full transition-all ${isLoadingMic ? 'bg-gray-700 opacity-50 cursor-not-allowed' :
+          onClick={handleMicToggle}
+          disabled={isLoadingMic || !isMicReady}
+          title={!isMicReady ? 'Microphone not available' : ''}
+          className={`p-4 rounded-full transition-all ${isLoadingMic || !isMicReady ? 'bg-gray-700 opacity-50 cursor-not-allowed' :
               isAudioEnabled ? 'bg-gray-700 hover:bg-gray-600' : 'bg-red-500 hover:bg-red-600'
             }`}
         >
