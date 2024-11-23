@@ -121,7 +121,7 @@ export default function Page({ params }: PageProps) {
   )
 }
 
-export function ErrorBoundary({ error }: { error: Error }) {
+Page.ErrorBoundary = function ErrorBoundary({ error }: { error: Error }) {
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center">
       <div className="text-center text-white">
