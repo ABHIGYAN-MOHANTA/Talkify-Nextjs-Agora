@@ -217,10 +217,10 @@ function Videos({
           disabled={isLoadingCam || !isCameraReady}
           title={!isCameraReady ? 'Camera not available' : ''}
           className={`p-4 rounded-full transition-all ${isLoadingCam || !isCameraReady
-              ? 'bg-gray-700 opacity-50 cursor-not-allowed'
-              : isVideoEnabled
-                ? 'bg-gray-700 hover:bg-gray-600'
-                : 'bg-red-500 hover:bg-red-600'
+            ? 'bg-gray-700 opacity-50 cursor-not-allowed'
+            : isVideoEnabled
+              ? 'bg-gray-700 hover:bg-gray-600'
+              : 'bg-red-500 hover:bg-red-600'
             }`}
         >
           {isLoadingCam ? (
@@ -237,10 +237,10 @@ function Videos({
           disabled={isLoadingMic || !isMicReady}
           title={!isMicReady ? 'Microphone not available' : ''}
           className={`p-4 rounded-full transition-all ${isLoadingMic || !isMicReady
-              ? 'bg-gray-700 opacity-50 cursor-not-allowed'
-              : isAudioEnabled
-                ? 'bg-gray-700 hover:bg-gray-600'
-                : 'bg-red-500 hover:bg-red-600'
+            ? 'bg-gray-700 opacity-50 cursor-not-allowed'
+            : isAudioEnabled
+              ? 'bg-gray-700 hover:bg-gray-600'
+              : 'bg-red-500 hover:bg-red-600'
             }`}
         >
           {isLoadingMic ? (
@@ -255,8 +255,8 @@ function Videos({
         <button
           onClick={handleScreenShareToggle}
           className={`p-4 rounded-full transition-all ${isScreenSharing
-              ? 'bg-red-500 hover:bg-red-600'
-              : 'bg-gray-700 hover:bg-gray-600'
+            ? 'bg-red-500 hover:bg-red-600'
+            : 'bg-gray-700 hover:bg-gray-600'
             }`}
         >
           {isScreenSharing ? (
