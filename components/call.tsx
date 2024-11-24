@@ -69,6 +69,10 @@ function Videos({
     AgoraRTC.createClient({ codec: 'vp8', mode: 'rtc' })
   );
 
+  const sclient = useRTCClient(
+    AgoraRTC.createClient({ codec: 'vp8', mode: 'rtc' })
+  );
+
   useJoin({
     appid: appId,
     channel: channelName,
@@ -126,34 +130,100 @@ function Videos({
       if (isScreenSharing) {
         // Stop screen sharing
         if (screenTrack) {
-          await client.unpublish(screenTrack);
-          screenTrack.close();
-          setScreenTrack(null);
+          try {
+            // Stop the track first
+            await screenTrack.stop();
+            // Unpublish the track
+            await sclient.unpublish(screenTrack);
+            // Close and dispose of the track
+            screenTrack.close();
+            // Leave the channel with screen share client
+            await sclient.leave();
+            // Reset states
+            setScreenTrack(null);
+            setIsScreenSharing(false);
+          } catch (stopError) {
+            console.error('Error stopping screen share:', stopError);
+            // Force cleanup even if there's an error
+            screenTrack.close();
+            await sclient.leave();
+            setScreenTrack(null);
+            setIsScreenSharing(false);
+          }
         }
-        setIsScreenSharing(false);
       } else {
-        // Ensure the client has joined the channel
-        if (!client.connectionState || client.connectionState !== 'CONNECTED') {
-          await client.join(appId, channelName, stoken, suid);
+        try {
+          // Join channel with screen share client if not already connected
+          if (!sclient.connectionState || sclient.connectionState !== 'CONNECTED') {
+            await sclient.join(appId, channelName, stoken, suid);
+          }
+
+          // Create screen share track
+          const screenTracks = await AgoraRTC.createScreenVideoTrack(
+            {
+              encoderConfig: '1080p_1',
+              optimizationMode: 'detail', // Optimize for detail
+              screenSourceType: 'screen', // Explicitly set source type
+            },
+            'disable'
+          );
+
+          // Handle if screenTracks is an array or a single track
+          const track = Array.isArray(screenTracks) ? screenTracks[0] : screenTracks;
+
+          // Set up screen share stopped callback
+          track.on('track-ended', async () => {
+            try {
+              await track.stop();
+              await sclient.unpublish(track);
+              track.close();
+              await sclient.leave();
+              setScreenTrack(null);
+              setIsScreenSharing(false);
+            } catch (error) {
+              console.error('Error in track-ended handler:', error);
+              // Force cleanup
+              track.close();
+              await sclient.leave();
+              setScreenTrack(null);
+              setIsScreenSharing(false);
+            }
+          });
+
+          // Publish the track
+          await sclient.publish(track);
+          setScreenTrack(track);
+          setIsScreenSharing(true);
+
+        } catch (error) {
+          console.error('Error starting screen share:', error);
+          // Clean up if screen share fails
+          if (screenTrack) {
+            try {
+              await screenTrack.stop();
+              screenTrack.close();
+              await sclient.leave();
+            } catch (cleanupError) {
+              console.error('Error during cleanup:', cleanupError);
+            }
+          }
+          setScreenTrack(null);
+          setIsScreenSharing(false);
         }
-
-        // Start screen sharing
-        const screenTracks = await AgoraRTC.createScreenVideoTrack(
-          {
-            encoderConfig: '1080p_1', // Video encoding settings
-          },
-          'disable' // Disable screen share audio
-        );
-
-        // Handle if screenTracks is an array or a single track
-        const track = Array.isArray(screenTracks) ? screenTracks[0] : screenTracks;
-
-        await client.publish(track);
-        setScreenTrack(track);
-        setIsScreenSharing(true);
       }
     } catch (error) {
       console.error('Error toggling screen sharing:', error);
+      // Reset state if there's an error
+      if (screenTrack) {
+        try {
+          await screenTrack.stop();
+          screenTrack.close();
+        } catch (e) {
+          console.error('Error during error cleanup:', e);
+        }
+      }
+      setIsScreenSharing(false);
+      setScreenTrack(null);
     }
   };
 
